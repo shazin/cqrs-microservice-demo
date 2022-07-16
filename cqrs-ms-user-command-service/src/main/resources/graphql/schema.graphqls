@@ -1,0 +1,27 @@
+scalar Date
+
+type User {
+    id: ID!
+    firstName: String
+    lastName: String
+    dateOfBirth: Date
+    identityNumber: Int
+}
+
+input UserInput {
+    firstName: String
+    lastName: String
+    dateOfBirth: Date
+    identityNumber: Int
+}
+
+type Mutation {
+    # restricted
+    createUser(user: UserInput!): User
+    deleteUser(id: ID!): ID
+}
+
+type Query {
+    allUsers: [User]
+    findOne(id: ID!): User
+}

@@ -1,0 +1,3 @@
+Manifest-Version: 1.0
+Start-Class: com.github.shazin.cqrs.ms.user.query.Main
+Main-Class: org.springframework.boot.loader.JarLauncher

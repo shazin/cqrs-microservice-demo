@@ -1,0 +1,14 @@
+scalar Date
+
+type User {
+    id: ID!
+    firstName: String
+    lastName: String
+    dateOfBirth: Date
+    identityNumber: Int
+}
+
+type Query {
+    allUsers: [User]
+    findOne(id: ID!): User
+}

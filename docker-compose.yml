@@ -1,0 +1,72 @@
+version: '2'
+
+networks:
+  cqrs-network:
+    driver: bridge
+
+services:
+  zookeeper:
+    image: 'bitnami/zookeeper:latest'
+    ports:
+      - "2181:2181"
+    networks:
+      - cqrs-network
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+  kafka:
+    image: 'bitnami/kafka:latest'
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    networks:
+      - cqrs-network
+    environment:
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+  db:
+    image: mysql
+    # NOTE: use of "mysql_native_password" is not recommended: https://dev.mysql.com/doc/refman/8.0/en/upgrading-from-previous-series.html#upgrade-caching-sha2-password
+    # (this is just an example, not intended to be a production configuration)
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    networks:
+      - cqrs-network
+
+  cqrs-ms-user-command-service:
+    platform: linux/amd64 #Required for Mac M1 PRO
+    build: ./cqrs-ms-user-command-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+      - KAFKA_TOPIC_NAME=com.github.shazin.cqrs.ms.users.json
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.hsqldb.jdbc.JDBCDriver
+      - SPRING_DATASOURCE_URL=jdbc:hsqldb:mem:testdb;DB_CLOSE_DELAY=-1
+      - SPRING_DATASOURCE_USERNAME=sa
+      - SPRING_DATASOURCE_PASSWORD=
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=create
+    depends_on:
+      - kafka
+    networks:
+      - cqrs-network
+  cqrs-ms-user-query-service:
+    platform: linux/amd64 #Required for Mac M1 PRO
+    build: ./cqrs-ms-user-query-service
+    ports:
+      - '8080:8080'
+    environment:
+      - KAFKA_TOPIC_NAME=com.github.shazin.cqrs.ms.users.json
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db/userdb?autoReconnect=true&useSSL=false&createDatabaseIfNotExist=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=create
+      - HIBERNATE_DIALECT=org.hibernate.dialect.MySQL8Dialect
+    depends_on:
+      - kafka
+      - db
+    networks:
+      - cqrs-network
