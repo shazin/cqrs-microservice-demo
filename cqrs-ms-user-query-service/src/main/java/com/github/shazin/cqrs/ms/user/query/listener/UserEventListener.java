@@ -1,18 +1,16 @@
 package com.github.shazin.cqrs.ms.user.query.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.shazin.cqrs.ms.user.dto.User;
-import com.github.shazin.cqrs.ms.user.dto.UserCreateEvent;
-import com.github.shazin.cqrs.ms.user.dto.UserDeleteEvent;
 import com.github.shazin.cqrs.ms.user.query.entity.UserEntity;
 import com.github.shazin.cqrs.ms.user.query.repo.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.Map;
-import java.util.UUID;
 
 @Component
 public class UserEventListener {
@@ -28,19 +26,23 @@ public class UserEventListener {
     }
 
     @KafkaListener(topics = "${kafka.topic.name}")
-    public void consume(String message) {
-        try {
-            Map<String, String> userEvent = objectMapper.readValue(message, Map.class);
-            if (userEvent.get("type").equals("CREATE")) {
-                UserCreateEvent userCreateEvent = objectMapper.readValue(message, UserCreateEvent.class);
-                User user = userCreateEvent.user();
-                userRepository.save(new UserEntity(UUID.randomUUID().toString(), user.firstName(), user.lastName(), user.dateOfBirth(), user.identityNumber()));
-            } else if (userEvent.get("type").equals("DELETE")) {
-                UserDeleteEvent userDeleteEvent = objectMapper.readValue(message, UserDeleteEvent.class);
-                userRepository.deleteById(userDeleteEvent.id());
+    public void consume(@Payload(required = false) String message) {
+        if (StringUtils.hasText(message)) {
+            try {
+                Map<String, Object> event = objectMapper.readValue(message, Map.class);
+                Map<String, Object> payload = (Map<String, Object>) event.get("payload");
+                if (payload.get("before") == null && payload.get("after") != null) {
+                    LOGGER.info("Create/Update Event");
+                    UserEntity userToBeCreated = objectMapper.convertValue(payload.get("after"), UserEntity.class);
+                    userRepository.save(userToBeCreated);
+                } else if (payload.get("before") != null && payload.get("after") == null) {
+                    LOGGER.info("Delete Event");
+                    UserEntity userToBeDeleted = objectMapper.convertValue(payload.get("before"), UserEntity.class);
+                    userRepository.delete(userToBeDeleted);
+                }
+            } catch (Exception e) {
+                LOGGER.error("Error while handling message", e);
             }
-        } catch (Exception e) {
-            LOGGER.error("Error while handling message", e);
         }
     }
 }

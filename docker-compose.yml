@@ -42,14 +42,16 @@ services:
       - "8081:8081"
     environment:
       - SERVER_PORT=8081
-      - KAFKA_TOPIC_NAME=com.github.shazin.cqrs.ms.users.json
-      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.hsqldb.jdbc.JDBCDriver
-      - SPRING_DATASOURCE_URL=jdbc:hsqldb:mem:testdb;DB_CLOSE_DELAY=-1
-      - SPRING_DATASOURCE_USERNAME=sa
-      - SPRING_DATASOURCE_PASSWORD=
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db/userrdb?autoReconnect=true&useSSL=false&createDatabaseIfNotExist=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
       - SPRING_JPA_HIBERNATE_DDL_AUTO=create
+      - HIBERNATE_DIALECT=org.hibernate.dialect.MySQL8Dialect
     depends_on:
       - kafka
+      - db
+      - debezium
     networks:
       - cqrs-network
   cqrs-ms-user-query-service:
@@ -58,9 +60,9 @@ services:
     ports:
       - '8080:8080'
     environment:
-      - KAFKA_TOPIC_NAME=com.github.shazin.cqrs.ms.users.json
+      - KAFKA_TOPIC_NAME=dbserver1.userrdb.cqrs_user
       - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
-      - SPRING_DATASOURCE_URL=jdbc:mysql://db/userdb?autoReconnect=true&useSSL=false&createDatabaseIfNotExist=true
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db/userwdb?autoReconnect=true&useSSL=false&createDatabaseIfNotExist=true
       - SPRING_DATASOURCE_USERNAME=root
       - SPRING_DATASOURCE_PASSWORD=root
       - SPRING_JPA_HIBERNATE_DDL_AUTO=create
@@ -68,5 +70,20 @@ services:
     depends_on:
       - kafka
       - db
+      - debezium
+    networks:
+      - cqrs-network
+  debezium:
+    image: debezium/connect:0.10
+    ports:
+      - '8083:8083'
+    environment:
+      - GROUP_ID=debz_1
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - CONFIG_STORAGE_TOPIC=cqrs_connect_configs
+      - OFFSET_STORAGE_TOPIC=cqrs_connect_offsets
+      - STATUS_STORAGE_TOPIC=cqrs_connect_statuses
+    depends_on:
+      - kafka
     networks:
       - cqrs-network
